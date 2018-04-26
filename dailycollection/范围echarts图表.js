@@ -2,12 +2,10 @@
     MakeShutDownChart:function(){
     	var myShutDownChart=echarts.init(document.getElementById('shutDownChart'));
     	var jsonData=[
-    		{workCenter:"生料磨",regularClass:"早班",startShutDownTime:"2",endShutDownTime:"4",useTime:2},
-    		{workCenter:"测试磨",regularClass:"午班",startShutDownTime:"7",endShutDownTime:"8",useTime:1},
-    		{workCenter:"生料磨",regularClass:"早班",startShutDownTime:"5",endShutDownTime:"6",useTime:1},
-    		{workCenter:"一号水泥磨",regularClass:"午班",startShutDownTime:"1",endShutDownTime:"5",useTime:4},
-    		{workCenter:"生料磨",regularClass:"午班",startShutDownTime:"7",endShutDownTime:"8",useTime:1},
-    		{workCenter:"二号水泥磨",regularClass:"晚班",startShutDownTime:"3",endShutDownTime:"5",useTime:2}
+    		{workCenter:"生料磨",regularClass:"午班",startShutDownTime:"2018-04-25 09:00:00",endShutDownTime:"2018-04-25 16:00:00",useTime:6.070},
+    		{workCenter:"煤磨",regularClass:"早班",startShutDownTime:"2018-04-25 12:36:53",endShutDownTime:"2018-04-25 13:29:21",useTime:0.870},
+    		{workCenter:"测试磨",regularClass:"晚班",startShutDownTime:"2018-04-25 12:36:53",endShutDownTime:"2018-04-25 20:29:21",useTime:0.870},
+    		{workCenter:"测试磨",regularClass:"早班",startShutDownTime:"2018-04-25 02:36:53",endShutDownTime:"2018-04-25 11:29:21",useTime:0.870}
     	];
     	var workCenterName="";
     	var objArr=[];
@@ -42,6 +40,12 @@
 		    {name: '午班'}
 		];
 		var series=[];
+		var xData=[];
+		for(var i=0;i<23;i++){
+			var dateString;
+			dateString=i<10?"0"+i+":00":i+":00";
+			xData.push(dateString);
+		}
 		// Generate mock data
 		echarts.util.each(objArr, function (value, index) {
 			workCenters.push(value.workCenter);
@@ -49,16 +53,15 @@
 		    for (var i = 0; i < num; i++) {
 		    	var data = [];
 		    	var $seriesObj={};
-		    	var baseTime = Number(value.Data[i].startShutDownTime);
+		    	var baseTime = parseTime(TimeSpinnerOperation.Formatter(new Date(value.Data[i].startShutDownTime)));
+		    	var endTime = parseTime(TimeSpinnerOperation.Formatter(new Date(value.Data[i].endShutDownTime)));
 		    	var regularClass=value.Data[i].regularClass;
-		    	var duration = value.Data[i].useTime;
 		    	var currentIndex=types.findIndex(function(value){
 			    	return value.name==regularClass;
 			    })
 		        var typeItem = types[currentIndex];
 		        $seriesObj.name=regularClass;
 		        $seriesObj.type='custom';
-		        $seriesObj.renderItem=renderItem;
 		        $seriesObj.itemStyle={normal: {opacity: 0.8}};
 		        $seriesObj.encode={x: [1, 2],y: 0};
 		        data.push({
@@ -66,15 +69,26 @@
 		            value: [
 		                index,
 		                baseTime,
-		                baseTime += duration,
-		                duration
+		                endTime,
+		                endTime-baseTime
 		            ]
 		        });
 		        $seriesObj.data=data;
+		        $seriesObj.renderItem=renderItem;
 		        series.push($seriesObj);
 		    }
 		});
-		
+		function formatDuring(mss) {
+		    var hours = parseInt((mss % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+		    hours=hours<10?"0"+hours:hours;
+		    var minutes = parseInt((mss % (1000 * 60 * 60)) / (1000 * 60));
+		    minutes=minutes<10?"0"+minutes:minutes;
+		    return   hours+ " : " + minutes;
+		}
+		function parseTime(time) {
+		    var seconds=time.substr(0,2)*1000*3600+time.substr(3,2)*60*1000+time.substr(-2)*1000
+		    return  seconds;
+		}
 		function renderItem(params, api) {
 		    var categoryIndex = api.value(0);
 		    var start = api.coord([api.value(1), categoryIndex]);
@@ -82,43 +96,49 @@
 		    var height = api.size([0, 1])[1] * 0.4;
 		    return {
 		        type: 'rect',
-		        shape: echarts.graphic.clipRectByRect({
-		            x: start[0],
-		            y: start[1] - height / 2,
-		            width: end[0] - start[0],
-		            height: height  
-		        }, {
-		            x: params.coordSys.x,
-		            y: params.coordSys.y,
-		            width: params.coordSys.width,
-		            height: params.coordSys.height
-		        }),
+		        shape: {
+                    // 矩形的位置和大小。
+                    x: start[0],
+                    y: start[1] - height / 2,
+                    width: end[0] - start[0],
+                    height: height
+                },
 		        style: api.style()
 		    };
 		}
 		var option = {
 		    tooltip: {
 		        formatter: function (params) {
-		        	console.log(JSON.stringify(params));
-		            return params.marker + params.data.name + ': ' + params.value[3] + ' 小时';
+		            return params.marker + params.data.name + ': ' + (params.value[3]/(3600*1000)).toFixed(2) + ' 小时';
 		        }
 		    },
-		    legend: {
+		    legend: { 
 		        type:'plain',
 		        data: ['晚班', '早班','午班']
 		    },
-		    color: ['#EEEE00', '#FF3E96','#4209ea'],
+		    color: ['#cfd1f1', '#1e9ce8','#9599de'],
 		    grid: {
 		    	left:'-5',
 		    	containLabel:true,
 		    },
-		    xAxis: { 
-		        scale:true,
+		    xAxis: {
+		    	type:'time',
+		    	min:0,
+		    	max:24*3600*1000,
+		    	interval:2*3600*1000,
+		    	axisLabel:{
+		    		rotate:'45',	
+		    		fontSize:5,
+		    		formatter: function(value,index){
+		    			return formatDuring(value);
+		    		}
+		    	},
+		        scale:true
 		    },
-		    yAxis: {
+		    yAxis: { 
 		    	axisLabel:{
 		    		rotate:'45',
-		    		fontSize:5
+		    		fontSize:9
 		    	},
 		        data: workCenters
 		    },
